@@ -80,8 +80,8 @@ $installButton.Add_Click({
                 "Install Office"   {f2}
                 "Install Chrome"   {Install-Chrome}
                 "Disable automatic updates"  {Pause-AutoUpdates}
-                "Install EY Templates" {f5}
-                "Install EY Fonts" {f6}
+                "Install EY Templates" {Install-Templates}
+                "Install EY Fonts" {Install-Fonts}
             }
             $selectedTasks += $checkbox.Text
         }
@@ -102,28 +102,6 @@ $installButton.Add_Click({
 })
 
 
-
-
-
-function Pause-AutoUpdates{
-    # Define the maximum pause period (35 days)
-    $Days = 35
-
-    # Calculate the date to pause updates until
-    $PauseEndDate = (Get-Date).AddDays($Days)
-
-    # Set the Windows Update pause date in the registry
-    #Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "PauseFeatureUpdatesStartTime" -Value (Get-Date) -Force
-    #Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "PauseFeatureUpdatesEndTime" -Value $PauseEndDate -Force
-
-    #Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "PauseQualityUpdatesStartTime" -Value (Get-Date) -Force
-    #Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "PauseQualityUpdatesEndTime" -Value $PauseEndDate -Force
-    
-    #[System.Windows.Forms.MessageBox]::Show("Automatic updates have been paused for $Days days until $PauseEndDate.")
-    Write-Host "Automatic updates have been paused for $Days days until $PauseEndDate."
-}
-
-
 function f1{
     Write-Host "f1"
 }
@@ -132,7 +110,7 @@ function f2{
     Write-Host "f2"
 }
 
-function Install-Chrome{
+function Install-Chrome {
     $Path = $env:TEMP
     $Installer = 'chrome_installer.exe'
     try {
@@ -162,17 +140,67 @@ function Install-Chrome{
     }
 }
 
+function Pause-AutoUpdates {
+    # Define the maximum pause period (35 days)
+    $Days = 35
 
-function f5{
-    Write-Host "f5"
+    # Calculate the date to pause updates until
+    $PauseEndDate = (Get-Date).AddDays($Days)
+
+    # Set the Windows Update pause date in the registry
+    #Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "PauseFeatureUpdatesStartTime" -Value (Get-Date) -Force
+    #Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "PauseFeatureUpdatesEndTime" -Value $PauseEndDate -Force
+
+    #Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "PauseQualityUpdatesStartTime" -Value (Get-Date) -Force
+    #Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "PauseQualityUpdatesEndTime" -Value $PauseEndDate -Force
+    
+    #[System.Windows.Forms.MessageBox]::Show("Automatic updates have been paused for $Days days until $PauseEndDate.")
+    Write-Host "Automatic updates have been paused for $Days days until $PauseEndDate."
 }
-function f6{
-    Write-Host "f6"
+
+
+function Install-Templates{
+    Write-Host "Templates"
 }
+function Install-Fonts {
+    param (
+        [string]$FontDirectory = $PSScriptRoot,
+        [string]$FontsPath = "C:\Windows\Fonts"
+    )
 
+    # Check if the specified directory exists
+    if (-Not (Test-Path $FontDirectory)) {
+        Write-Error "The specified font directory does not exist: $FontDirectory"
+        return
+    }
 
+    # Get all font files in the specified directory
+    $fontFiles = Get-ChildItem -Path $FontDirectory -Recurse -Include *.ttf, *.otf -File
 
+    if ($fontFiles.Count -eq 0) {
+        Write-Host "No font files found in the directory: $FontDirectory"
+        return
+    }
 
+    # Install each font
+    foreach ($font in $fontFiles) {
+        try {
+            # Copy the font file to the Windows Fonts directory
+            Copy-Item -Path $font.FullName -Destination $FontsPath -Force
+            
+            # Register the font with Windows
+            $fontRegKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
+            $fontName = [System.IO.Path]::GetFileNameWithoutExtension($font.Name)
+            Set-ItemProperty -Path $fontRegKey -Name "$fontName (TrueType)" -Value $font.Name
+
+            Write-Host "Installed font: $fontName"
+        } catch {
+            Write-Error "Failed to install font '$($font.Name)': $_"
+        }
+    }
+
+    Write-Host "Font installation completed."
+}
 
 
 
