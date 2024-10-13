@@ -4,27 +4,27 @@ Add-Type -AssemblyName System.Windows.Forms
 # Create the form
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Pick an Event"
-$form.Size = New-Object System.Drawing.Size(350,400)
+$form.Size = New-Object System.Drawing.Size(350, 400)
 $form.StartPosition = "CenterScreen"
 
 # Create a group box to hold the radio buttons
 $groupBox = New-Object System.Windows.Forms.GroupBox
 $groupBox.Text = "Choose an option:"
-$groupBox.Size = New-Object System.Drawing.Size(300,80)
-$groupBox.Location = New-Object System.Drawing.Point(20,20)
+$groupBox.Size = New-Object System.Drawing.Size(300, 80)
+$groupBox.Location = New-Object System.Drawing.Point(20, 20)
 $form.Controls.Add($groupBox)
 
 # Create a radio button for "AI Masterclass"
 $radioAIMasterclass = New-Object System.Windows.Forms.RadioButton
 $radioAIMasterclass.Text = "AI Masterclass"
-$radioAIMasterclass.Location = New-Object System.Drawing.Point(20,30)
+$radioAIMasterclass.Location = New-Object System.Drawing.Point(20, 30)
 $radioAIMasterclass.Checked = $true  # Set as default
 $groupBox.Controls.Add($radioAIMasterclass)
 
 # Create a radio button for "AMEvents"
 $radioAMEvents = New-Object System.Windows.Forms.RadioButton
 $radioAMEvents.Text = "AMEvents"
-$radioAMEvents.Location = New-Object System.Drawing.Point(150,30)
+$radioAMEvents.Location = New-Object System.Drawing.Point(150, 30)
 $groupBox.Controls.Add($radioAMEvents)
 
 # Create checkboxes for tasks below the radio buttons
@@ -36,7 +36,7 @@ function Add-Checkbox {
     $checkbox = New-Object System.Windows.Forms.CheckBox
     $checkbox.Text = $text
     $checkbox.Location = New-Object System.Drawing.Point($x, $y)
-    $checkbox.Size = New-Object System.Drawing.Size(250,20)
+    $checkbox.Size = New-Object System.Drawing.Size(250, 20)
     $checkbox.Checked = $true  # Pre-check the checkbox
     $form.Controls.Add($checkbox)
     $global:checkboxes += $checkbox
@@ -55,79 +55,145 @@ Add-Checkbox "Install Fonts" 20 260
 # Create the "Install" button
 $installButton = New-Object System.Windows.Forms.Button
 $installButton.Text = "Install"
-$installButton.Location = New-Object System.Drawing.Point(125,290)
-$installButton.Size = New-Object System.Drawing.Size(100,30)
+$installButton.Location = New-Object System.Drawing.Point(125, 290)
+$installButton.Size = New-Object System.Drawing.Size(100, 30)
 $form.Controls.Add($installButton)
 
 
 
 # Event handler for the "Install" button
 $installButton.Add_Click({
-    # Capture selected radio button
-    if ($radioAIMasterclass.Checked) {
-        $selectedEvent = "AIMasterclass"
-        
-    } elseif ($radioAMEvents.Checked) {
-        $selectedEvent = "AMEvents"
-    }
-
-    # Capture selected checkboxes
-    $selectedTasks = @()
-    foreach ($checkbox in $global:checkboxes) {
-        if ($checkbox.Checked) {
-            switch ($checkbox.Text) {
-                "Uninstall Office" {Uninstall-Office}
-                "Install Office"   {Install-Office}
-                "Install Chrome"   {Install-Chrome}
-                "Pause automatic updates"  {Pause-AutoUpdates}
-                "Install Templates" {Install-Templates}
-                "Install Fonts" {Install-Fonts}
-            }
-            $selectedTasks += $checkbox.Text
+        # Capture selected radio button
+        if ($radioAIMasterclass.Checked) {
+            AIMasterclass
         }
-    }
+        elseif ($radioAMEvents.Checked) {
+            AMEvents
+        }
 
-    # Display the chosen event and selected tasks
-    $message = "You picked $selectedEvent.`nSelected tasks:"
-    if ($selectedTasks.Count -eq 0) {
-        $message += "`nNone"
-    } else {
-       $message += "`n" + ($selectedTasks -join "`n")
-    }
+        # Capture selected checkboxes
+        $selectedTasks = @()
+        foreach ($checkbox in $global:checkboxes) {
+            if ($checkbox.Checked) {
+                switch ($checkbox.Text) {
+                    "Uninstall Office" { Uninstall-Office }
+                    "Install Office" { Install-Office }
+                    "Install Chrome" { Install-Chrome }
+                    "Pause automatic updates" { Suspend-AutoUpdates }
+                    "Install Templates" { Install-Templates }
+                    "Install Fonts" { Install-Fonts }
+                }
+            
+                $selectedTasks += $checkbox.Text
+            }
+        }
 
-    Write-Host $message
-    # Show the message box
-    #[System.Windows.Forms.MessageBox]::Show($message)
-    #$form.Close()
-})
+        [System.Windows.Forms.MessageBox]::Show("All tasks have been completed successfully.")
+    })
 
+# Check if the script is running with administrator privileges.
 function Test-Admin {
     # Check if the current user is an administrator
     $isAdmin = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
     if ($isAdmin.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host "The script is running with administrator privileges."
         return $true
-    } else {
+    }
+    else {
         Write-Host "The script is NOT running with administrator privileges."
         return $false
     }
 }
 
+function Test-InternetConnection {
+    param (
+        [string]$TestHost = "www.google.com"  # Default host to test
+    )
 
-
-
-
-
-
-
-
-
-function Uninstall-Office{
-    Write-Host "f1"
+    try {
+        $pingResult = Test-Connection -ComputerName $TestHost -Count 2 -ErrorAction Stop
+        if ($pingResult) {
+            Write-Host "Internet connection is active."
+            return $true
+        }
+    }
+    catch {
+        $message = "Internet connection not detected. Please check your Wi-Fi or Ethernet connection, and ensure that your router is powered on."
+        Write-Host "Internet connection is NOT active."
+        [System.Windows.Forms.MessageBox]::Show($message)
+        $form.Close()
+        return $false
+    }
 }
 
-function Install-Office{
-    Write-Host "f2"
+function AIMasterclass {
+    param (
+        [string]$FolderName = "Fonts"  # Name of the folder to copy
+    )
+
+    # Get the script's directory
+    $scriptPath = $PSScriptRoot
+
+    # Get the source folder path
+    $sourceFolder = Join-Path -Path $scriptPath -ChildPath $FolderName
+
+    # Get the path to the desktop
+    $desktopPath = [System.IO.Path]::Combine($env:USERPROFILE, 'Desktop')
+
+    # Build the destination path
+    $destinationFolder = Join-Path -Path $desktopPath -ChildPath $FolderName
+
+    # Check if the source folder exists
+    if (-Not (Test-Path $sourceFolder)) {
+        Write-Host "Source folder not found: $sourceFolder" -ForegroundColor Red
+        return
+    }
+
+    # Copy the folder and all its subfolders to the desktop
+    try {
+        Copy-Item -Path $sourceFolder -Destination $destinationFolder -Recurse -Force
+        Write-Host "Folder copied to desktop: $destinationFolder" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Failed to copy folder: $_" -ForegroundColor Red
+    }
+}
+
+function AMEvents {
+
+    param (
+        [string]$SourceFilePath = "$PSScriptRoot\caffeine.exe"  # Full path of the file to copy
+    )
+    
+    # Get the user's startup folder path
+    $startupFolder = [System.IO.Path]::Combine($env:APPDATA, 'Microsoft\Windows\Start Menu\Programs\Startup')
+    
+    # Check if the source file exists
+    if (-Not (Test-Path $SourceFilePath)) {
+        Write-Host "Source file not found: $SourceFilePath" -ForegroundColor Red
+        return
+    }
+    
+    # Build the destination path in the startup folder
+    $destinationFilePath = [System.IO.Path]::Combine($startupFolder, [System.IO.Path]::GetFileName($SourceFilePath))
+    
+    # Copy the file to the startup folder
+    try {
+        Copy-Item -Path $SourceFilePath -Destination $destinationFilePath -Force
+        Write-Host "File copied to startup folder: $destinationFilePath" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Failed to copy file: $_" -ForegroundColor Red
+    }
+}
+
+
+function Uninstall-Office {
+    Write-Host "Not Implemented"
+}
+
+function Install-Office {
+    Write-Host "Not Implemented"
 }
 
 function Install-Chrome {
@@ -146,13 +212,16 @@ function Install-Chrome {
         Remove-Item -Path $Path\$Installer -Force
         Write-Host "Chrome has been installed successfully."
 
-    } catch [System.Net.WebException] {
+    }
+    catch [System.Net.WebException] {
         Write-Error "Network error occurred while downloading the installer: $_. Exception message: $($_.Exception.Message)"
         Add-Content -Path $LogFile -Value "Network error: $($_.Exception.Message)"
-    } catch [System.Exception] {
+    }
+    catch [System.Exception] {
         Write-Error "An error occurred during the installation: $_. Exception message: $($_.Exception.Message)"
         Add-Content -Path $LogFile -Value "Installation error: $($_.Exception.Message)"
-    } finally {
+    }
+    finally {
         # Ensure cleanup even if there was an error
         if (Test-Path "$Path\$Installer") {
             Remove-Item -Path "$Path\$Installer" -Force -ErrorAction SilentlyContinue
@@ -160,27 +229,28 @@ function Install-Chrome {
     }
 }
 
-function Pause-AutoUpdates {
-    # Define the maximum pause period (35 days)
-    $Days = 35
+#Pause updates for 35 days
+function Suspend-AutoUpdates {
 
-    # Calculate the date to pause updates until
-    $PauseEndDate = (Get-Date).AddDays($Days)
+    # Registry path for Group Policy updates
+    $regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate"
+    # Create the registry key if it doesn't exist
+    if (-Not (Test-Path $regPath)) {
+        New-Item -Path $regPath -Force
+    }
 
-    # Set the Windows Update pause date in the registry
-    #Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "PauseFeatureUpdatesStartTime" -Value (Get-Date) -Force
-    #Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "PauseFeatureUpdatesEndTime" -Value $PauseEndDate -Force
+    # Set the pause for both quality and feature updates
+    Set-ItemProperty -Path $regPath -Name "DeferFeatureUpdates" -Value 1 -Force
+    Set-ItemProperty -Path $regPath -Name "DeferQualityUpdates" -Value 1 -Force
+    Set-ItemProperty -Path $regPath -Name "DeferUpdatePeriodInDays" -Value 35 -Force
 
-    #Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "PauseQualityUpdatesStartTime" -Value (Get-Date) -Force
-    #Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "PauseQualityUpdatesEndTime" -Value $PauseEndDate -Force
-    
-    #[System.Windows.Forms.MessageBox]::Show("Automatic updates have been paused for $Days days until $PauseEndDate.")
-    Write-Host "Automatic updates have been paused for $Days days until $PauseEndDate."
+    Write-Host "Windows updates have been paused for 35 days via Group Policy." -ForegroundColor Green
+    gpupdate /force
 }
 
 function Install-Templates {
     param (
-        [string]$SourceDirectory = "$PSScriptRoot\Templates",  # Default to a Templates subdirectory in the script directory
+        [string]$SourceDirectory = "$PSScriptRoot\Templates", # Default to a Templates subdirectory in the script directory
         [string]$TargetDirectory = "$env:USERPROFILE\Documents\Templates"  # Default target directory
     )
 
@@ -210,7 +280,8 @@ function Install-Templates {
             # Copy the template file to the target directory
             Copy-Item -Path $template.FullName -Destination $TargetDirectory -Force
             Write-Host "Installed template: $($template.Name)"
-        } catch {
+        }
+        catch {
             Write-Error "Failed to install template '$($template.Name)': $_"
         }
     }
@@ -250,7 +321,8 @@ function Install-Fonts {
             Set-ItemProperty -Path $fontRegKey -Name "$fontName (TrueType)" -Value $font.Name
 
             Write-Host "Installed font: $fontName"
-        } catch {
+        }
+        catch {
             Write-Error "Failed to install font '$($font.Name)': $_"
         }
     }
@@ -267,6 +339,9 @@ if (-Not (Test-Admin)) {
     Write-Host $message
     exit
 }
+
+# Call the function to test the internet connection
+Test-InternetConnection
 # Show the form
 $form.Add_Shown({ $form.Activate() })
 [void]$form.ShowDialog()
