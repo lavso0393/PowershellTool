@@ -46,7 +46,7 @@ function Add-Checkbox {
 Add-Checkbox "Uninstall Office" 20 110
 Add-Checkbox "Install Office" 20 140
 Add-Checkbox "Install Chrome" 20 170
-Add-Checkbox "Disable automatic updates" 20 200
+Add-Checkbox "Pause automatic updates" 20 200
 Add-Checkbox "Install Templates" 20 230
 Add-Checkbox "Install Fonts" 20 260
 
@@ -76,10 +76,10 @@ $installButton.Add_Click({
     foreach ($checkbox in $global:checkboxes) {
         if ($checkbox.Checked) {
             switch ($checkbox.Text) {
-                "Uninstall Office" {f1}
-                "Install Office"   {f2}
+                "Uninstall Office" {Uninstall-Office}
+                "Install Office"   {Install-Office}
                 "Install Chrome"   {Install-Chrome}
-                "Disable automatic updates"  {Pause-AutoUpdates}
+                "Pause automatic updates"  {Pause-AutoUpdates}
                 "Install Templates" {Install-Templates}
                 "Install Fonts" {Install-Fonts}
             }
@@ -89,11 +89,11 @@ $installButton.Add_Click({
 
     # Display the chosen event and selected tasks
     $message = "You picked $selectedEvent.`nSelected tasks:"
-    #if ($selectedTasks.Count -eq 0) {
-   #     $message += "`nNone"
-   # } else {
-   #    $message += "`n" + ($selectedTasks -join "`n")
-    #}
+    if ($selectedTasks.Count -eq 0) {
+        $message += "`nNone"
+    } else {
+       $message += "`n" + ($selectedTasks -join "`n")
+    }
 
     Write-Host $message
     # Show the message box
@@ -101,12 +101,32 @@ $installButton.Add_Click({
     #$form.Close()
 })
 
+function Test-Admin {
+    # Check if the current user is an administrator
+    $isAdmin = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
+    if ($isAdmin.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        Write-Host "The script is running with administrator privileges."
+        return $true
+    } else {
+        Write-Host "The script is NOT running with administrator privileges."
+        return $false
+    }
+}
 
-function f1{
+
+
+
+
+
+
+
+
+
+function Uninstall-Office{
     Write-Host "f1"
 }
 
-function f2{
+function Install-Office{
     Write-Host "f2"
 }
 
@@ -158,7 +178,6 @@ function Pause-AutoUpdates {
     Write-Host "Automatic updates have been paused for $Days days until $PauseEndDate."
 }
 
-
 function Install-Templates {
     param (
         [string]$SourceDirectory = "$PSScriptRoot\Templates",  # Default to a Templates subdirectory in the script directory
@@ -198,7 +217,6 @@ function Install-Templates {
 
     Write-Host "Template installation completed."
 }
-
 
 function Install-Fonts {
     param (
@@ -241,7 +259,14 @@ function Install-Fonts {
 }
 
 
-
+#Check Admin Rights
+if (-Not (Test-Admin)) {
+    $message = "Please run the script with administrator privileges."
+    [System.Windows.Forms.MessageBox]::Show($message)
+    $form.Close()
+    Write-Host $message
+    exit
+}
 # Show the form
 $form.Add_Shown({ $form.Activate() })
 [void]$form.ShowDialog()
