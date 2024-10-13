@@ -47,8 +47,8 @@ Add-Checkbox "Uninstall Office" 20 110
 Add-Checkbox "Install Office" 20 140
 Add-Checkbox "Install Chrome" 20 170
 Add-Checkbox "Disable automatic updates" 20 200
-Add-Checkbox "Install EY Templates" 20 230
-Add-Checkbox "Install EY Fonts" 20 260
+Add-Checkbox "Install Templates" 20 230
+Add-Checkbox "Install Fonts" 20 260
 
 
 
@@ -65,7 +65,7 @@ $form.Controls.Add($installButton)
 $installButton.Add_Click({
     # Capture selected radio button
     if ($radioAIMasterclass.Checked) {
-        $selectedEvent = "AI Masterclass"
+        $selectedEvent = "AIMasterclass"
         
     } elseif ($radioAMEvents.Checked) {
         $selectedEvent = "AMEvents"
@@ -80,8 +80,8 @@ $installButton.Add_Click({
                 "Install Office"   {f2}
                 "Install Chrome"   {Install-Chrome}
                 "Disable automatic updates"  {Pause-AutoUpdates}
-                "Install EY Templates" {Install-Templates}
-                "Install EY Fonts" {Install-Fonts}
+                "Install Templates" {Install-Templates}
+                "Install Fonts" {Install-Fonts}
             }
             $selectedTasks += $checkbox.Text
         }
@@ -89,11 +89,11 @@ $installButton.Add_Click({
 
     # Display the chosen event and selected tasks
     $message = "You picked $selectedEvent.`nSelected tasks:"
-    if ($selectedTasks.Count -eq 0) {
-        $message += "`nNone"
-    } else {
-        $message += "`n" + ($selectedTasks -join "`n")
-    }
+    #if ($selectedTasks.Count -eq 0) {
+   #     $message += "`nNone"
+   # } else {
+   #    $message += "`n" + ($selectedTasks -join "`n")
+    #}
 
     Write-Host $message
     # Show the message box
@@ -159,9 +159,47 @@ function Pause-AutoUpdates {
 }
 
 
-function Install-Templates{
-    Write-Host "Templates"
+function Install-Templates {
+    param (
+        [string]$SourceDirectory = "$PSScriptRoot\Templates",  # Default to a Templates subdirectory in the script directory
+        [string]$TargetDirectory = "$env:USERPROFILE\Documents\Templates"  # Default target directory
+    )
+
+    # Check if the source directory exists
+    if (-Not (Test-Path $SourceDirectory)) {
+        Write-Error "The specified source directory does not exist: $SourceDirectory"
+        return
+    }
+
+    # Ensure the target directory exists; create it if it doesn't
+    if (-Not (Test-Path $TargetDirectory)) {
+        New-Item -Path $TargetDirectory -ItemType Directory | Out-Null
+        Write-Host "Created target directory: $TargetDirectory"
+    }
+
+    # Get all template files in the source directory
+    $templateFiles = Get-ChildItem -Path $SourceDirectory -File
+
+    if ($templateFiles.Count -eq 0) {
+        Write-Host "No template files found in the directory: $SourceDirectory"
+        return
+    }
+
+    # Install each template
+    foreach ($template in $templateFiles) {
+        try {
+            # Copy the template file to the target directory
+            Copy-Item -Path $template.FullName -Destination $TargetDirectory -Force
+            Write-Host "Installed template: $($template.Name)"
+        } catch {
+            Write-Error "Failed to install template '$($template.Name)': $_"
+        }
+    }
+
+    Write-Host "Template installation completed."
 }
+
+
 function Install-Fonts {
     param (
         [string]$FontDirectory = $PSScriptRoot,
