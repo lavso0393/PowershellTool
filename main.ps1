@@ -128,7 +128,7 @@ function Test-InternetConnection {
 
 function AIMasterclass {
     param (
-        [string]$FolderName = "Fonts"  # Name of the folder to copy
+        [string]$FolderName = "Snack"  # Name of the folder to copy
     )
 
     # Get the script's directory
@@ -187,13 +187,52 @@ function AMEvents {
     }
 }
 
-
+#note remplace Where-Object and Select-Object for Where and Select
 function Uninstall-Office {
-    Write-Host "Not Implemented"
+    try {
+        Write-Host "Uninstalling Office"
+        $OfficeUninstallStrings = ((Get-ItemProperty "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*") `
+                + (Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*") | 
+            Where-Object { $_.DisplayName -like "*Microsoft 365 *" } | Select-Object UninstallString).UninstallString
+
+        ForEach ($UninstallString in $OfficeUninstallStrings) {
+            $UninstallEXE = ($UninstallString -split '"')[1]
+            $UninstallArg = ($UninstallString -split '"')[2] + " DisplayLevel=False"
+            Start-Process -FilePath $UninstallEXE -ArgumentList $UninstallArg -Wait
+        }
+        Write-Host "Uninstalling Office done..."
+    }
+    catch {
+        # Handle the error
+        Write-Error "An error occurred: $_"
+    }
+
 }
 
 function Install-Office {
-    Write-Host "Not Implemented"
+    $xml = "Office2019ProPlus.xml"
+    $officeInstaller = "setup.exe"
+
+    try {
+        Write-Host "Installing Office..."
+        Start-Process -FilePath "$PSScriptRoot\$officeInstaller" -ArgumentList "/configure", "$PSScriptRoot\$xml" -Wait
+
+        Write-host "Activating Office..."
+        Start-Process "$PSScriptRoot\O2K19_LICENSING.EXE" -Wait
+
+        Write-Host "Office has been installed successfully."
+    
+    }
+    catch [System.Net.WebException] {
+        Write-Error "Network error occurred while downloading the installer: $_. Exception message: $($_.Exception.Message)"
+        Add-Content -Path $LogFile -Value "Network error: $($_.Exception.Message)"
+    }
+    catch [System.Exception] {
+        Write-Error "An error occurred during the installation: $_. Exception message: $($_.Exception.Message)"
+        Add-Content -Path $LogFile -Value "Installation error: $($_.Exception.Message)"
+    }
+    
+
 }
 
 function Install-Chrome {
@@ -206,7 +245,7 @@ function Install-Chrome {
     
         # Start the installation process silently
         Write-Host "Installing Google Chrome..."
-        #Start-Process -FilePath $Path\$Installer -Args '/silent /install' -Verb RunAs -Wait
+        Start-Process -FilePath $Path\$Installer -Args '/silent /install' -Verb RunAs -Wait
     
         # Remove the installer after installation
         Remove-Item -Path $Path\$Installer -Force
@@ -250,44 +289,77 @@ function Suspend-AutoUpdates {
 
 function Install-Templates {
     param (
-        [string]$SourceDirectory = "$PSScriptRoot\Templates", # Default to a Templates subdirectory in the script directory
-        [string]$TargetDirectory = "$env:USERPROFILE\Documents\Templates"  # Default target directory
+        [string]$SourceDirectory = "$PSScriptRoot", # Default to a Templates subdirectory in the script directory
+        [string]$TargetDirectory = "$env:USERPROFILE\AppData\Roaming\Microsoft\Templates\"  # Default target directory
+        
     )
 
-    # Check if the source directory exists
-    if (-Not (Test-Path $SourceDirectory)) {
-        Write-Error "The specified source directory does not exist: $SourceDirectory"
+    # Get all Template files in the specified directory
+    $TemplateFiles = Get-ChildItem -Path $SourceDirectory -Recurse -Include *.dotx, *.potx -File
+
+    if ($TemplateFiles.Count -eq 0) {
+        Write-Host "No Template files found in the directory: $SourceDirectory"
         return
     }
 
     # Ensure the target directory exists; create it if it doesn't
-    if (-Not (Test-Path $TargetDirectory)) {
-        New-Item -Path $TargetDirectory -ItemType Directory | Out-Null
-        Write-Host "Created target directory: $TargetDirectory"
+    if (-Not (Test-Path "$TargetDirectory\Word")) {
+        New-Item -Path "$TargetDirectory\Word" -ItemType Directory | Out-Null
+        Write-Host "Created target directory: $TargetDirectory\Word"
     }
-
-    # Get all template files in the source directory
-    $templateFiles = Get-ChildItem -Path $SourceDirectory -File
-
-    if ($templateFiles.Count -eq 0) {
-        Write-Host "No template files found in the directory: $SourceDirectory"
-        return
+    if (-Not (Test-Path "$TargetDirectory\Powerpoint")) {
+        New-Item -Path "$TargetDirectory\Powerpoint" -ItemType Directory | Out-Null
+        Write-Host "Created target directory: $TargetDirectory\Powerpoint"
     }
-
+    
     # Install each template
     foreach ($template in $templateFiles) {
         try {
             # Copy the template file to the target directory
-            Copy-Item -Path $template.FullName -Destination $TargetDirectory -Force
-            Write-Host "Installed template: $($template.Name)"
+            $extension = [System.IO.Path]::GetExtension($template.FullName).ToLower().Trim()
+        
+            if ($extension -eq ".dotx") {
+                Copy-Item -Path $template.FullName -Destination "$TargetDirectory\Word" -Force
+            
+            }
+            else {
+                Copy-Item -Path $template.FullName -Destination "$TargetDirectory\Powerpoint" -Force
+            }
         }
         catch {
-            Write-Error "Failed to install template '$($template.Name)': $_"
+            Write-Error "Failed to Copy template '$($template.Name)': $_"
         }
+    
+    }
+    # Define the registry paths for Word and PowerPoint
+    $keyPathWord = "HKCU:\Software\Microsoft\Office\16.0\Word\Options"
+    $keyPathPwrPoint = "HKCU:\Software\Microsoft\Office\16.0\PowerPoint\Options"
+
+    # Set the default templates paths for Word and PowerPoint
+    try {
+        # Create the Word registry key
+        New-Item -Path $keyPathWord -Force
+        # Set the Word personal templates location
+        Set-ItemProperty -Path $keyPathWord -Name "PERSONALTEMPLATES" -Value "$TargetDirectory\Word"
+        Write-Host "Word templates path set successfully."
+    }
+    catch {
+        Write-Error "Failed to set Word templates path: $_"
     }
 
+    try {
+        # Create the PowerPoint registry key
+        New-Item -Path $keyPathPwrPoint -Force
+        # Set the PowerPoint personal templates location
+        Set-ItemProperty -Path $keyPathPwrPoint -Name "PERSONALTEMPLATES" -Value "$TargetDirectory\Powerpoint"
+        Write-Host "PowerPoint templates path set successfully."
+    }
+    catch {
+        Write-Error "Failed to set PowerPoint templates path: $_"
+    }
     Write-Host "Template installation completed."
 }
+
 
 function Install-Fonts {
     param (

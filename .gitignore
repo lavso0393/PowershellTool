@@ -1,3 +1,5 @@
 test.ps1
 Fonts
 *.exe
+pwrtool
+*.pub
